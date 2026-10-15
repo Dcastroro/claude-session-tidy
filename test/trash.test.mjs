@@ -339,3 +339,25 @@ test("a file name that restore could not put back safely is refused up front", (
   assert.throws(() => del(w, [ID_A]), /a file with a name I will not move/);
   assert.deepEqual(snapshot(w.claude), before);
 });
+
+test("restore works after the whole config folder was moved: the manifest holds paths inside it, not where it was", () => {
+  const { w } = setup();
+  const before = snapshot(w.claude);
+  del(w, [ID_A]);
+  const moved = path.join(w.base, "moved-config");
+  fs.renameSync(w.claude, moved);
+  restoreSession({ ...w.env, CLAUDE_CONFIG_DIR: moved }, ID_A, { now: NOW });
+  const after = snapshot(moved);
+  for (const [rel, f] of Object.entries(before)) assert.equal(after[rel]?.text, f.text, rel);
+});
+
+test("a project folder and a title with unicode and emoji round-trip", () => {
+  const w = world("unicode");
+  const s = session(w, { id: ID_A, project: "projekt-ü-日本語", prompt: "Fix the 🔥 bug in naïve résumé parser", companions: true });
+  const before = snapshot(w.claude);
+  const [plan] = del(w, [ID_A]);
+  assert.ok(plan.files > 5);
+  restoreSession(w.env, ID_A, { now: NOW });
+  assert.deepEqual(without(snapshot(w.claude), "session-tidy/"), before);
+  assert.ok(fs.existsSync(s.file));
+});

@@ -487,3 +487,14 @@ test("150 sessions in 10 projects: --all lists them all, sorted, and --limit kee
   const one = JSON.parse((await run(["list", "--json"], x, { cwd: made[3].root })).out);
   assert.equal(one.total, 15, "one project of ten");
 });
+
+test("stray files and empty folders in projects/ are ignored", async () => {
+  const x = world("stray");
+  const s = session(x, { id: A, project: "shop" });
+  fs.writeFileSync(path.join(x.claude, "projects", "a-file-not-a-folder"), "x");
+  fs.mkdirSync(path.join(x.claude, "projects", "empty-project-folder"));
+  fs.writeFileSync(path.join(s.dir, ".DS_Store"), "x");
+  const r = await run(["list", "--all", "--json"], x, { cwd: s.root });
+  assert.equal(r.code, 0, r.all);
+  assert.equal(JSON.parse(r.out).total, 1);
+});
