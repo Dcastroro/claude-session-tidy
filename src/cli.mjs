@@ -22,7 +22,7 @@ import { REPO_URL, VERSION } from "./version.mjs";
 // ---------------------------------------------------------------------------------------------
 
 export const COMMANDS = {
-  list: { run: cmdList, bool: ["all", "json", "markdown"], value: ["project", "sort", "limit"] },
+  list: { run: cmdList, bool: ["all", "json", "markdown"], value: ["project", "sort", "limit", "due"] },
   delete: { run: cmdDelete, bool: ["dry-run", "json"], value: [] },
   restore: { run: cmdRestore, bool: ["dry-run", "json"], value: [] },
   keep: { run: cmdKeep, bool: ["dry-run", "json"], value: [] },
@@ -99,6 +99,7 @@ async function cmdList(args, ctx) {
   const sort = args.sort === undefined ? "age" : String(args.sort);
   if (!["age", "size", "prompts"].includes(sort)) fail("--sort must be age, size or prompts.");
   const limit = args.limit === undefined ? Infinity : wholeNumber(args.limit, "--limit");
+  const due = args.due === undefined ? undefined : wholeNumber(args.due, "--due");
   const scope = scopeOf(args, ctx);
   const { env, now } = ctx;
   const retention = readRetention(env, { projectDir: scope.dir });
@@ -111,7 +112,9 @@ async function cmdList(args, ctx) {
   if (sort === "age") { sessions.forEach(withActivity); sessions.sort(byTime); }
   else if (sort === "size") { sessions.forEach((s) => withSize(store, s)); measured = true; sessions.forEach(withActivity); sessions.sort((a, b) => b.totalBytes - a.totalBytes || byTime(a, b)); }
   else { sessions.forEach((s) => { withScan(s); withActivity(s); }); sessions.sort((a, b) => b.prompts - a.prompts || byTime(a, b)); }
-  const rows = sessions.slice(0, limit);
+  if (due !== undefined) sessions.forEach((s) => withSweep(s, retention, now));
+  const matching = due === undefined ? sessions : sessions.filter((s) => s.sweep.daysLeft !== null && s.sweep.daysLeft <= due);
+  const rows = matching.slice(0, limit);
   const shorts = shortIds(sessions.map((s) => s.id));
   for (const r of rows) {
     withScan(r); withActivity(r); withSize(store, r); withSweep(r, retention, now);
@@ -127,7 +130,7 @@ async function cmdList(args, ctx) {
   // Kept sessions that are not in this table may sit in another project; only those missing everywhere are reported.
   const keptMissing = scope.all ? everKept.filter((id) => !present.has(id)) : [];
   const model = {
-    scope, sort, retention, rows, shown: rows.length, total: sessions.length,
+    scope, sort, retention, rows, due, matched: matching.length, shown: rows.length, total: sessions.length,
     totalBytes: measured ? sessions.reduce((n, s) => n + (s.totalBytes ?? 0), 0) : null,
     keptCount: scope.all ? everKept.length : keptHere, keptMissing, hook, trash: trashSummary(env),
   };
@@ -143,7 +146,7 @@ async function cmdList(args, ctx) {
     return 0;
   }
   if (args.markdown) { ctx.say(renderListMarkdown(model)); return 0; }
-  if (!rows.length) {
+  if (!rows.length && due === undefined) {
     ctx.say(`No Claude Code sessions found for ${scope.label} (looked in ${projectsDir(env)}).`);
     if (!scope.all) ctx.say(ctx.c.dim("Use --all to list every project's sessions."));
     return 0;
@@ -307,7 +310,7 @@ async function cmdUninstall(args, ctx) {
 const helpText = (c) => `${c.bold("claude-session-tidy")} ${VERSION}: list, delete, keep and restore your Claude Code sessions.
 
 ${c.bold("Look")}
-  claude-session-tidy list [--all | --project <dir>] [--sort age|size|prompts] [--limit <n>] [--json | --markdown]
+  claude-session-tidy list [--all | --project <dir>] [--sort age|size|prompts] [--due <days>] [--limit <n>] [--json | --markdown]
 
 ${c.bold("Delete, with a way back")}
   claude-session-tidy delete <id...> [--dry-run] [--json]      move sessions to the trash

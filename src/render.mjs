@@ -36,7 +36,9 @@ function notes(m) {
 }
 
 function header(m) {
-  const count = m.shown < m.total ? `${m.shown} of ${m.total}` : `${m.total}`;
+  const count = m.due === undefined
+    ? (m.shown < m.total ? `${m.shown} of ${m.total}` : `${m.total}`)
+    : `${m.shown < m.matched ? `${m.shown} of ${m.matched}` : m.shown} due within ${plural(m.due, "day")}, of ${m.total}`;
   const where = m.scope.all ? "all projects" : m.scope.label;
   return { title: `Sessions in ${where} (${count}, ${SORT_LABEL[m.sort]})`, cleanup: `Cleanup: ${describeRetention(m.retention)}.` };
 }

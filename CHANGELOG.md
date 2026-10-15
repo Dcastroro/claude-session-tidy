@@ -2,6 +2,10 @@
 
 All notable changes to claude-session-tidy are written here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+- Add `list --due <days>` to show sessions due for cleanup within a chosen number of days, including overdue and kept sessions, before applying `--limit`.
+
 ## [1.0.1] - 2026-10-15
 
 - The skill's description is shorter, "List sessions with size and cleanup date." instead of "List this project's sessions, size and sweep date.", so that Claude Code's "always-on" estimate for the plugin falls from about 17 to about 15 tokens. That keeps the nine plugins of the [Claude Code toolkit](https://github.com/nrzz/claude-code-toolkit) together under its limit of 150. Nothing else changed.

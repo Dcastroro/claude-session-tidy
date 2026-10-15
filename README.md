@@ -22,6 +22,8 @@ Claude Code cannot delete a session from inside, and it silently removes transcr
 | The skill in Claude's skill list | 0 | `/session-tidy:list` is user-only (`disable-model-invocation`). With the plugin loaded, the request Claude Code sent to the model had no trace of the plugin or the skill's description (checked with a fake server, `test/e2e-plugin.test.mjs`). `claude plugin details` still projects about 15 tokens "always-on" for the description; it counts it although the skill is user-only |
 | `/session-tidy:list` | about 1,300 to 1,500, once | Going in: the skill text (a header line and 455 characters of instructions, about 140 tokens; `claude plugin details` estimates about 100) and the table for 15 sessions, 1,800 to 2,200 characters (about 450 to 550). Claude Code 2.1.295 on Windows hands the model the command as "run this first" (about 70 more tokens for the call); Claude Code 2.1.300 on Linux and macOS runs it itself and pastes the table into the skill text. Coming out: the table shown again, as the skill asks (the same 450 to 550), and at most 6 lines of advice (about 120). The table is capped: `--markdown` never prints more than 40 rows or about 60 lines, and the skill asks for 15. Token figures are characters divided by 4, an estimate, not a count by Claude's tokenizer. The free route is the same table in a terminal: `claude-session-tidy list` |
 
+`--due` does not change the default skill command or its row cap. If you explicitly pass a filtered markdown report to a model, its header adds 19 characters in the example `(3 due within 7 days, of 41)` compared with `(3 of 41)`, or 25 with a limit, `(3 of 10 due within 7 days, of 41)`: about 5 or 6 extra input tokens by the same characters-divided-by-4 estimate. The CLI itself still costs 0 tokens.
+
 ## Install
 
 **From a terminal**, with Node 18 or newer. There is nothing to install and no dependency:
@@ -55,7 +57,7 @@ Then type `/session-tidy:list`. It lists the current project's 15 newest session
 ## Use
 
 ```text
-claude-session-tidy list [--all | --project <dir>] [--sort age|size|prompts] [--limit <n>] [--json | --markdown]
+claude-session-tidy list [--all | --project <dir>] [--sort age|size|prompts] [--due <days>] [--limit <n>] [--json | --markdown]
 claude-session-tidy delete <id...> [--dry-run] [--json]
 claude-session-tidy restore [<id>] [--dry-run] [--json]
 claude-session-tidy keep <id...> [--dry-run] [--json]
@@ -90,6 +92,7 @@ Cleanup: 30 days without a change (cleanupPeriodDays is not set, so Claude Code'
 - **KEPT** is `yes` for a session on the keep list. It still shows the day the cleanup would remove the session, because that is what happens if nothing refreshes it; a kept session that is `due` is flagged under the table.
 - **LAST ACTIVITY** is the newest timestamp inside the transcript; the file's own modification time (which the cleanup uses) can differ, for example after a `keep` or a copy of the config folder.
 - **TITLE** is the `/rename` name, else Claude's title, else the first prompt.
+- `--due 7` shows sessions whose cleanup is due within the next 7 days, including sessions already `due` and kept sessions. It excludes `exempt` and `paused` sessions, filters before `--limit`, and works with `--all`, `--json` and `--markdown`. The number of days must be a whole number of 1 or more.
 - `--sort size` puts the biggest first and `--sort prompts` the longest conversations; `--limit 15` shows 15. `--markdown` prints the compact table the skill uses (at most 40 rows).
 
 ### delete and restore
@@ -234,9 +237,10 @@ claude-session-tidy runs only on your machine. It has no network code, no teleme
 
 ## What was verified, and how
 
-Checked on 2026-10-15 on Windows 11 with Node 24.19 and Claude Code 2.1.295 (the binary bundled with the desktop app):
+The initial release was checked on 2026-10-15 on Windows 11 with Node 24.19 and Claude Code 2.1.295 (the binary bundled with the desktop app):
 
-- **197 automated tests** (`npm test`, Node's own runner, no dependencies; the runner also lists the 3 helper files under `test/` as passing, which are not counted). Without `E2E_CLAUDE`, 10 are skipped: the 9 that run the real binary, and 1 that needs a colon in a file name, which Windows does not allow. With `E2E_CLAUDE` pointing at Claude Code 2.1.295, 196 passed on this machine and that one was skipped. They run on synthetic config folders in temporary folders and never read `~/.claude`.
+- **197 automated tests at the initial release** (`npm test`, Node's own runner, no dependencies; the runner also lists the 3 helper files under `test/` as passing, which are not counted). Without `E2E_CLAUDE`, 10 are skipped: the 9 that run the real binary, and 1 that needs a colon in a file name, which Windows does not allow. With `E2E_CLAUDE` pointing at Claude Code 2.1.295, 196 passed on this machine and that one was skipped. They run on synthetic config folders in temporary folders and never read `~/.claude`.
+- **The due filter**, checked on macOS with Node 20.19.1 (`test/cli.test.mjs`): a fixed clock and synthetic sessions check the exact cutoff and the moments on either side, overdue, kept, exempt and paused sessions, filtering before limits for every sort, project scope, full JSON rows, text and markdown headers, and unchanged files. These checks do not run Claude Code.
 - **The cleanup, against the real binary** (`test/e2e-retention.test.mjs`, run with `E2E_CLAUDE` pointing at the binary; the same checks pass in CI on Linux and macOS with Claude Code 2.1.300): eight sessions of different kinds in a throwaway config with `cleanupPeriodDays: 1`. The binary was run until it wrote `.last-cleanup`. What `list` had predicted for each session (`due`, `scheduled`, `exempt`) is what happened: old files removed with their folders, a fresh file with old records kept, Claude Desktop sessions kept, a desktop session released by a `delete` or an old `archive` marker removed, `sdk-cli` removed, old `tool-results` removed even from a kept session, and the folders listed above left behind. The same file checks that a session touched by `keep` and `refresh` survives whole (transcript, tool results, subagents, title) while its untouched twin is removed, and that the trash and the keep list survive.
 - **The hook** (same file): `init` in a throwaway config, then the real binary; the kept session's files were touched before the cleanup began, the twin was removed, nothing of the hook reached the model's request, and no error was logged. The plugin's own `hooks/hooks.json` does the same (`test/e2e-plugin.test.mjs`).
 - **Delete, restore, resume** (`test/e2e-resume.test.mjs`): a real session written by the binary; after `delete`, `claude -p --resume <id>` answers "No conversation found" and makes no request; after `restore` every file is back byte for byte and `--resume` sends the first prompt, its answer and the new prompt (checked on what a fake server received). A restored session that was 20 days old is touched. `claude --continue` resumes the session whose file was touched last, not the one with the newest records inside (which is why `refresh` touches a session only when it must).

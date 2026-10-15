@@ -66,6 +66,90 @@ test("--option=value works, and -- ends the options", async () => {
 
 // --- list --------------------------------------------------------------------------------------
 
+test("list --due validates a whole number of days", async () => {
+  for (const bad of ["0", "-1", "x", "1.5", "", "9007199254740992"]) {
+    const r = await run(["list", `--due=${bad}`], w);
+    assert.equal(r.code, 1);
+    assert.match(r.err, /--due needs a whole number, 1 or more/);
+  }
+  assert.match((await run(["list", "--due"], w)).err, /--due needs a value/);
+  assert.match((await run(["list", "--due", "0", "--json"], w)).out, /whole number/);
+});
+
+test("list --due includes overdue and exact cutoff sessions, but not later or exempt ones", async () => {
+  const x = world("due-boundary");
+  session(x, { id: A, ageDays: 31 });
+  session(x, { id: B, ageDays: 30 });
+  session(x, { id: C, mtime: NOW - 23 * DAY - 1000 });
+  session(x, { id: D, ageDays: 23 });
+  session(x, { id: uuidOf(1), mtime: NOW - 23 * DAY + 1000 });
+  session(x, { id: uuidOf(2), ageDays: 60, entrypoint: "claude-desktop" });
+  const before = snapshot(x.claude);
+  const all = JSON.parse((await run(["list", "--all", "--json"], x)).out);
+  const r = await run(["list", "--all", "--due=7", "--json"], x);
+  assert.equal(r.code, 0, r.all);
+  const j = JSON.parse(r.out);
+  assert.deepEqual(Object.keys(j), Object.keys(all), "the JSON document keeps its schema");
+  assert.equal(j.total, 6);
+  assert.equal(j.shown, 4);
+  assert.deepEqual(j.sessions, all.sessions.filter((s) => [A, B, C, D].includes(s.id)), "full rows and sort order survive the filter");
+  assert.deepEqual(snapshot(x.claude), before, "listing never changes the synthetic config");
+});
+
+test("list --due filters before --limit for every sort and respects project scope", async () => {
+  const x = world("due-limit");
+  const s = session(x, { id: A, project: "shop", ageDays: 1, prompts: 10 });
+  session(x, { id: B, project: "shop", ageDays: 23, prompts: 2 });
+  session(x, { id: C, project: "shop", ageDays: 31, prompts: 1 });
+  session(x, { id: D, project: "other", ageDays: 25 });
+  for (const sort of ["age", "size", "prompts"]) {
+    const all = JSON.parse((await run(["list", "--sort", sort, "--json"], x, { cwd: s.root })).out);
+    const r = await run(["list", "--sort", sort, "--due", "7", "--limit", "1", "--json"], x, { cwd: s.root });
+    assert.equal(r.code, 0, r.all);
+    const j = JSON.parse(r.out);
+    assert.equal(j.total, 3);
+    assert.equal(j.shown, 1);
+    assert.deepEqual(j.sessions, all.sessions.filter((s) => [B, C].includes(s.id)).slice(0, 1), sort);
+  }
+  const all = JSON.parse((await run(["list", "--all", "--due", "7", "--json"], x)).out);
+  assert.equal(all.shown, 3, "--all includes the other project's due session");
+});
+
+test("list --due retains kept sessions and excludes paused sessions without changing files", async () => {
+  const x = world("due-kept");
+  const s = session(x, { id: A, ageDays: 25 });
+  assert.equal((await run(["keep", "aaaaaaaa"], x)).code, 0);
+  fs.utimesSync(s.file, new Date(NOW - 31 * DAY), new Date(NOW - 31 * DAY));
+  const before = snapshot(x.claude);
+  const j = JSON.parse((await run(["list", "--all", "--due", "7", "--json"], x)).out);
+  assert.equal(j.sessions.length, 1);
+  assert.equal(j.sessions[0].kept, true);
+  assert.equal(j.sessions[0].sweep.state, "due");
+  assert.deepEqual(snapshot(x.claude), before);
+  x.settings({ cleanupPeriodDays: 0 });
+  const paused = JSON.parse((await run(["list", "--all", "--due", "7", "--json"], x)).out);
+  assert.equal(paused.total, 1);
+  assert.deepEqual(paused.sessions, []);
+});
+
+test("list --due explains the filter in text and markdown, including limits and no matches", async () => {
+  const x = world("due-header");
+  const s = session(x, { id: A, ageDays: 25 });
+  session(x, { id: B, ageDays: 29 });
+  session(x, { id: C, ageDays: 1 });
+  for (const format of [[], ["--markdown"]]) {
+    const r = await run(["list", "--due", "7", ...format], x, { cwd: s.root });
+    assert.equal(r.code, 0, r.all);
+    assert.match(r.out, /\(2 due within 7 days, of 3, newest first\)/);
+    const limited = await run(["list", "--due", "7", "--limit", "1", ...format], x, { cwd: s.root });
+    assert.match(limited.out, /\(1 of 2 due within 7 days, of 3, newest first\)/);
+    const empty = await run(["list", "--due", "1", ...format], x, { cwd: s.root, now: NOW - DAY });
+    assert.match(empty.out, /\(0 due within 1 day, of 3, newest first\)/);
+    assert.match(empty.out, /No sessions\./);
+    assert.ok(!empty.out.includes("No Claude Code sessions found"), "a filter with no matches does not claim the scope is empty");
+  }
+});
+
 test("list shows this project's sessions, newest first, with id, last activity, prompts, size, sweep day and title", async () => {
   const r = await run(["list"], w, { cwd: a.root });
   assert.equal(r.code, 0, r.all);
