@@ -526,7 +526,7 @@ test("the command runs as a program: CLAUDE_CONFIG_DIR is honoured, and it never
 test("the program prints help and the version without touching any file", () => {
   const x = world("proc3");
   const before = snapshot(x.claude);
-  assert.match(runCli(["--help"], { cwd: x.base, env: x.env }).out, /claude-session-tidy 1\.0\.1/);
+  assert.match(runCli(["--help"], { cwd: x.base, env: x.env }).out, /claude-session-tidy 1.1.0/);
   assert.equal(runCli(["--version"], { cwd: x.base, env: x.env }).out.trim(), pkg.version);
   const bad = runCli(["nope"], { cwd: x.base, env: x.env });
   assert.equal(bad.code, 1);

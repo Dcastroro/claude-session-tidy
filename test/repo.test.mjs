@@ -43,7 +43,7 @@ function headerImports(code) {
 
 test("package.json: name, version, module type, bin, engines, scripts, links, license", () => {
   assert.equal(pkg.name, "claude-session-tidy");
-  assert.equal(pkg.version, "1.0.1");
+  assert.equal(pkg.version, "1.1.0");
   assert.equal(pkg.type, "module");
   assert.deepEqual(pkg.bin, { "claude-session-tidy": "bin/claude-session-tidy.mjs" });
   assert.equal(pkg.engines.node, ">=18");

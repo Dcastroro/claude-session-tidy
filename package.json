@@ -1,6 +1,6 @@
 {
   "name": "claude-session-tidy",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "List, delete, keep and restore your Claude Code sessions: a trash with restore, a keep list that outlives the 30-day cleanup, and a tidy that finds empty and orphaned sessions. Zero tokens.",
   "type": "module",
   "bin": {

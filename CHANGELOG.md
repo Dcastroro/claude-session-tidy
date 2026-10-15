@@ -2,9 +2,9 @@
 
 All notable changes to claude-session-tidy are written here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.1.0] - 2026-10-15
 
-- Add `list --due <days>` to show sessions due for cleanup within a chosen number of days, including overdue and kept sessions, before applying `--limit`.
+- Add `list --due <days>` to show sessions due for cleanup within a chosen number of days, including overdue and kept sessions, before applying `--limit`. Contributed by @facelessdevhack in #2, the first outside pull request.
 
 ## [1.0.1] - 2026-10-15
 

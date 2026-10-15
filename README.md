@@ -151,7 +151,7 @@ claude-session-tidy init
   copied bin/ and src/ into ~/.claude/session-tidy/app
   backed up settings.json to ~/.claude/settings.json.bak-session-tidy-20261015-120000
   settings.json: SessionStart hook added (other settings untouched)
-  checked: the installed copy runs (version 1.0.1)
+  checked: the installed copy runs (version 1.1.0)
 
 The hook runs `refresh --quiet` when a session starts. It prints nothing, so it costs no tokens.
 Start a new Claude Code session (or run /hooks) so it picks the hook up.
