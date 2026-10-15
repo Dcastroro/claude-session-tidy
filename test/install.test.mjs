@@ -369,3 +369,16 @@ test("a config folder whose path has spaces: init, the hook started the way Clau
   assert.ok(uninstall(w.env, { now: NOW }).ok);
   assert.ok(!fs.existsSync(appDir(w.env)));
 });
+
+test("uninstall leaves no empty session-tidy folder behind, and keeps one that holds the person's data", () => {
+  const a = world("tidyfolder");
+  init(a.env, { now: NOW });
+  assert.ok(fs.existsSync(path.join(a.claude, "session-tidy")));
+  uninstall(a.env, { now: NOW });
+  assert.ok(!fs.existsSync(path.join(a.claude, "session-tidy")), "nothing of ours is left");
+  const b = world("tidyfolder2");
+  init(b.env, { now: NOW });
+  fs.writeFileSync(path.join(b.claude, "session-tidy", "keep.json"), '{"version":1,"kept":{}}\n');
+  uninstall(b.env, { now: NOW });
+  assert.deepEqual(fs.readdirSync(path.join(b.claude, "session-tidy")), ["keep.json"]);
+});

@@ -5,6 +5,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { DAY, ROOT, Transcript, addCompanions } from "./helpers.mjs";
 import { CLAUDE, fakeApi, runClaude, sandbox, skip } from "./claude-sandbox.mjs";
@@ -73,4 +74,26 @@ test("the plugin's own hook runs refresh when a session starts, and prints nothi
     assert.ok(!JSON.stringify(api.requests[0]).includes("refresh"), "nothing of the hook reached the model");
     assert.ok(!fs.existsSync(sb.file("session-tidy", "errors.log")));
   } finally { await api.close(); }
+});
+
+test("installed from a marketplace, the plugin's own cost projection is small and its hook costs the model nothing", { skip: skip(), timeout: 240000 }, () => {
+  const sb = sandbox("details");
+  const mkt = path.join(sb.root, "mkt");
+  const dest = path.join(mkt, "plugins", "session-tidy");
+  fs.mkdirSync(path.join(mkt, ".claude-plugin"), { recursive: true });
+  for (const item of ["bin", "src", "skills", "hooks", ".claude-plugin", "package.json"]) fs.cpSync(path.join(ROOT, item), path.join(dest, item), { recursive: true });
+  fs.writeFileSync(path.join(mkt, ".claude-plugin", "marketplace.json"), JSON.stringify({ name: "local-test", owner: { name: "test" }, plugins: [{ name: "session-tidy", description: "x", source: "./plugins/session-tidy" }] }));
+  const env = { ...process.env, CLAUDE_CONFIG_DIR: sb.cfg, HOME: sb.home, USERPROFILE: sb.home, DISABLE_AUTOUPDATER: "1", DISABLE_TELEMETRY: "1" };
+  for (const k of Object.keys(env)) if (/^(CLAUDE_CODE_|ANTHROPIC_)/.test(k)) delete env[k];
+  const claude = (...args) => spawnSync(CLAUDE, args, { encoding: "utf8", timeout: 100000, env, windowsHide: true });
+  const added = claude("plugin", "marketplace", "add", mkt);
+  assert.equal(added.status, 0, added.stdout + added.stderr);
+  const installed = claude("plugin", "install", "session-tidy@local-test");
+  assert.equal(installed.status, 0, installed.stdout + installed.stderr);
+  const details = claude("plugin", "details", "session-tidy");
+  assert.equal(details.status, 0, details.stdout + details.stderr);
+  assert.match(details.stdout, /Skills \(1\)\s+list/);
+  assert.match(details.stdout, /Hooks \(1\)\s+SessionStart\s+\(harness-only/, "the hook has no model context cost");
+  const always = /Always-on:\s+~(\d+) tok/.exec(details.stdout);
+  assert.ok(always && Number(always[1]) < 30, `always-on is ${always && always[1]} tokens`);
 });

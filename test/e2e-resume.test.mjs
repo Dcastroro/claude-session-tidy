@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fakeApi, messagesOf, runClaude, sandbox, skip, textReply } from "./claude-sandbox.mjs";
-import { snapshot } from "./helpers.mjs";
+import { Transcript, snapshot } from "./helpers.mjs";
 
 const ID = "5e5510a7-0000-4000-8000-000000000001";
 
@@ -78,4 +78,26 @@ test("a restored session that was old enough to be swept is touched, so resuming
   const again = await runClaude(sb, api, ["-p", "PROMPT-TWO", "--resume", ID, "--output-format", "json"]);
   assert.equal(again.code, 0, again.err);
   await api.close();
+});
+
+test("claude --continue picks the session with the newest file time, not the newest records: why refresh touches a session only when it must", { skip: skip(), timeout: 240000 }, async () => {
+  const sb = sandbox("continue");
+  const now = Date.now();
+  const DAYS = 86400000;
+  const make = (id, marker, stampMs, mtimeMs) => {
+    const t = new Transcript({ id, cwd: sb.work, start: new Date(stampMs).toISOString(), stepMs: 1000 });
+    t.prompt(marker);
+    t.say(`ANSWER-FOR-${marker}`);
+    return t.write(sb.cfg, { mtime: mtimeMs });
+  };
+  make("aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa", "MARKER-A-newest-records-oldest-file", now - 3600000, now - 3 * DAYS);
+  make("bbbbbbbb-1111-4111-8111-bbbbbbbbbbbb", "MARKER-B-oldest-records-newest-file", now - 2 * DAYS, now - 60000);
+  const api = await fakeApi();
+  try {
+    const r = await runClaude(sb, api, ["-p", "next question", "--continue", "--output-format", "json"]);
+    assert.equal(r.code, 0, r.err);
+    const sent = messagesOf(api.requests[0]);
+    assert.ok(sent.includes("MARKER-B"), "the session whose file was touched last was continued");
+    assert.ok(!sent.includes("MARKER-A"));
+  } finally { await api.close(); }
 });

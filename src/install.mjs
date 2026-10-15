@@ -283,5 +283,6 @@ export function uninstall(env, { dryRun = false, now = Date.now() } = {}) {
   }
   const tidy = path.dirname(appDir(env));
   for (const name of ["keep.json", "trash", "errors.log"]) if (exists(path.join(tidy, name))) out.kept.push(path.join(tidy, name));
+  if (!dryRun) { try { fs.rmdirSync(tidy); } catch { /* not empty: it holds the person's data */ } }
   return out;
 }
