@@ -1,6 +1,6 @@
 ---
 name: list
-description: List this project's sessions, size and sweep date.
+description: List sessions with size and cleanup date.
 disable-model-invocation: true
 allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/bin/claude-session-tidy.mjs" list *) Bash(node ${CLAUDE_PLUGIN_ROOT}/bin/claude-session-tidy.mjs list *)
 ---

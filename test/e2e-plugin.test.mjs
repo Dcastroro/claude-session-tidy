@@ -32,7 +32,7 @@ test("the user-only skill is not in what the model is given; /session-tidy:list 
     assert.equal(plain.code, 0, plain.err);
     const asked = JSON.stringify(api.requests[0]);
     assert.ok(!asked.includes("session-tidy"), "nothing of the plugin is in the first request");
-    assert.ok(!asked.includes("sessions, size and sweep date"), "not even the skill's description");
+    assert.ok(!asked.includes("sessions with size and cleanup date"), "not even the skill's description");
 
     const slash = await runClaude(sb, api, ["-p", "/session-tidy:list", "--plugin-dir", ROOT, "--output-format", "json"]);
     assert.equal(slash.code, 0, slash.err);
