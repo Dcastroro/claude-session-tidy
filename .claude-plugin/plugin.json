@@ -1,0 +1,15 @@
+{
+  "name": "session-tidy",
+  "displayName": "Session Tidy",
+  "version": "1.0.0",
+  "description": "List your Claude Code sessions with size and the day the 30-day cleanup removes them, then delete (with a restore) or keep them. One user-only skill: /session-tidy:list. A silent hook keeps the sessions you keep.",
+  "author": { "name": "Naresh Prabu" },
+  "homepage": "https://github.com/nrzz/claude-session-tidy",
+  "repository": "https://github.com/nrzz/claude-session-tidy",
+  "documentationUrl": "https://github.com/nrzz/claude-session-tidy#readme",
+  "supportUrl": "https://github.com/nrzz/claude-session-tidy/issues",
+  "privacyPolicyUrl": "https://github.com/nrzz/claude-session-tidy#privacy",
+  "termsOfServiceUrl": "https://github.com/nrzz/claude-session-tidy/blob/main/LICENSE",
+  "license": "MIT",
+  "keywords": ["sessions", "transcript", "cleanup", "retention", "disk-space", "backup"]
+}

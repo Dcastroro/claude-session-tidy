@@ -1,0 +1,42 @@
+{
+  "name": "claude-session-tidy",
+  "version": "1.0.0",
+  "description": "List, delete, keep and restore your Claude Code sessions: a trash with restore, a keep list that outlives the 30-day cleanup, and a tidy that finds empty and orphaned sessions. Zero tokens.",
+  "type": "module",
+  "bin": {
+    "claude-session-tidy": "bin/claude-session-tidy.mjs"
+  },
+  "files": [
+    "bin",
+    "src",
+    "skills",
+    "hooks",
+    ".claude-plugin",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "repository": "github:nrzz/claude-session-tidy",
+  "homepage": "https://github.com/nrzz/claude-session-tidy#readme",
+  "bugs": "https://github.com/nrzz/claude-session-tidy/issues",
+  "keywords": [
+    "claude",
+    "claude-code",
+    "anthropic",
+    "sessions",
+    "transcript",
+    "cleanup",
+    "retention",
+    "disk-space",
+    "backup",
+    "trash",
+    "restore"
+  ],
+  "author": "Naresh Prabu",
+  "license": "MIT"
+}

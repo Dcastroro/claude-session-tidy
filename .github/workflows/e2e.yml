@@ -1,0 +1,34 @@
+name: e2e
+
+# The checks that run the real Claude Code: which sessions its cleanup removes, that a restored session resumes
+# with its history, that the plugin validates and its hook keeps a kept session. They cost nothing: Claude Code
+# talks to a fake server on 127.0.0.1. Optional by design: if the binary cannot be installed, the checks skip.
+# Weekly, so a Claude Code release that changes the cleanup shows up here.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "23 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  claude:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Install the Claude Code CLI (the checks skip if this fails)
+        run: npm install -g @anthropic-ai/claude-code
+        continue-on-error: true
+      - name: Retention, resume and plugin checks against the real binary
+        run: node --test test/e2e-retention.test.mjs test/e2e-resume.test.mjs test/e2e-plugin.test.mjs
+        env:
+          E2E_CLAUDE: claude

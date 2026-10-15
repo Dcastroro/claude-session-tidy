@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/bin/claude-session-tidy.mjs", "refresh", "--quiet"],
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
