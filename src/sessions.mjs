@@ -44,11 +44,14 @@ export function findSessions(env, { all = false, root: given = "", meta: wantMet
   const base = projectsDir(env);
   const root = trimSlash(given);
   const rootSlug = root ? projectSlug(root).toLowerCase() : "";
+  // A very long path is cut at 200 characters and given a hash; matching on the 200 characters keeps working
+  // if the hash is not the one Claude Code computed, and the recorded folder is the final word anyway.
+  const longStart = rootSlug.length > 200 ? rootSlug.slice(0, 200) : "";
   const out = [];
   for (const d of listDir(base)) {
     if (!d.isDirectory()) continue;
     const name = d.name.toLowerCase();
-    if (!all && name !== rootSlug && !name.startsWith(`${rootSlug}-`)) continue;
+    if (!all && name !== rootSlug && !name.startsWith(`${rootSlug}-`) && !(longStart && name.startsWith(longStart))) continue;
     const dir = path.join(base, d.name);
     for (const f of listDir(dir)) {
       if (!f.isFile() || !f.name.endsWith(".jsonl")) continue;

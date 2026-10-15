@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { COMPANION_ROOTS, allCompanions, companionsOf, findSessions, makeStore, projectFolderExists, readReleaseMarker, resolveIds, safeId, shortIds, sized } from "../src/sessions.mjs";
+import { projectSlug } from "../src/config.mjs";
 import { NOW, Transcript, addBystanders, addCompanions, session, world } from "./helpers.mjs";
 
 const ID_A = "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa";
@@ -40,6 +41,21 @@ test("findSessions: Windows paths with spaces work the same on every system", ()
   assert.deepEqual(findSessions(w.env, { root: "C:\\Users\\Test User\\My Project\\sub folder" }).map((s) => s.id), [ID_B]);
   assert.deepEqual(findSessions(w.env, { root: "C:\\Users\\Test User" }).map((s) => s.id).sort(), [ID_A, ID_B], "the sessions of every folder inside it");
   assert.deepEqual(findSessions(w.env, { root: "C:\\Users\\Test User\\My" }).map((s) => s.id), [], "a folder whose name is only the start of the project's is another folder");
+});
+
+test("findSessions: a path over 200 characters (cut and hashed in the folder name) is still found", () => {
+  const w = world("longpath");
+  const cwd = `C:\\Users\\Test User\\${"a very long folder name ".repeat(12)}\\app`;
+  assert.ok(projectSlug(cwd).length > 200);
+  const t = new Transcript({ id: ID_A, cwd });
+  t.prompt("hi"); t.say("ok");
+  const written = t.write(w.claude);
+  assert.deepEqual(findSessions(w.env, { root: cwd }).map((s) => s.id), [ID_A]);
+  // the folder name ends in a hash Claude Code computed; if ours differs, the first 200 characters still match
+  const renamed = path.join(w.claude, "projects", `${written.slug.slice(0, 200)}-zzzzzz`);
+  fs.renameSync(written.dir, renamed);
+  assert.deepEqual(findSessions(w.env, { root: cwd }).map((s) => s.id), [ID_A]);
+  assert.deepEqual(findSessions(w.env, { root: `${cwd}2` }).map((s) => s.id), [], "a different folder with the same first 200 characters is told apart by the recorded folder");
 });
 
 test("findSessions skips subagent transcripts, other files, folders and a missing projects folder", () => {

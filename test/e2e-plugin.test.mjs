@@ -38,11 +38,18 @@ test("the user-only skill is not in what the model is given; /session-tidy:list 
     assert.equal(api.requests.length, 2);
     const skill = textBlocks(api.requests[1]).find((t) => t.startsWith("Base directory for this skill"));
     assert.ok(skill, "the skill text is in the request");
-    assert.match(skill, /run this first/);
-    assert.ok(skill.includes(`"${fwd(ROOT)}/bin/claude-session-tidy.mjs" list --project "${fwd(sb.work)}" --markdown --limit 15`), `the command, with the plugin folder and the project folder filled in:\n${skill}`);
+    // Claude Code hands the model the `!` line in one of two forms: as an instruction to run it first (the
+    // Windows desktop build 2.1.295, whose shell is PowerShell), or already run, its output pasted in its
+    // place (2.1.300 on Linux and macOS). Either way the command was built from the right folders.
+    if (/run this first/.test(skill)) {
+      assert.ok(skill.includes(`"${fwd(ROOT)}/bin/claude-session-tidy.mjs" list --project "${fwd(sb.work)}" --markdown --limit 15`), `the command, with the plugin folder and the project folder filled in:\n${skill}`);
+    } else {
+      assert.ok(skill.includes(`**Sessions in ${sb.work}`) || skill.includes(`**Sessions in ${fwd(sb.work)}`), `the output of the command, for the project folder:\n${skill}`);
+      assert.match(skill, /\| id \| last activity \| prompts \| size \| kept \| sweep \| title \|/);
+    }
     assert.match(skill, /Do nothing until the user agrees/);
     assert.ok(!skill.includes("${CLAUDE_"), "no variable is left unexpanded");
-    assert.ok(skill.length < 900, `${skill.length} characters`);
+    assert.ok(skill.length < 1200, `${skill.length} characters`);
   } finally { await api.close(); }
 });
 
