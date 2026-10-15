@@ -50,6 +50,11 @@ test("the cleanup removes sessions by the file's time, takes the session's folde
   };
   // Something of ours that must survive: an old file in the trash and the keep list.
   put(sb.file("session-tidy", "trash", "x", "files", "note.txt"), "old trash", old);
+  // The other folders of the config folder: an old and a fresh file in each. Which does the cleanup judge by age?
+  const aged = [["backups", ".claude.json.backup.1700000000000", ".claude.json.backup.1800000000000"], ["debug", "old.txt", "fresh.txt"], ["file-transfers", "old.txt", "fresh.txt"], ["logs", "old.txt", "fresh.txt"], ["paste-cache", "old.txt", "fresh.txt"], ["plans", "old.md", "fresh.md"], ["shell-snapshots", "snapshot-bash-1700000000000-abc123.sh", "snapshot-bash-1800000000000-def456.sh"], ["startup-perf", "old.txt", "fresh.txt"], ["statsig", "old.txt", "fresh.txt"], ["todos", "old.txt", "fresh.txt"]];
+  const left = ["cache", "file-history", "ide", "session-env", "state", "tasks", "telemetry", "uploads", "usage-data"];
+  for (const [dir, oldName, freshName] of aged) { put(sb.file(dir, oldName), "old", old); put(sb.file(dir, freshName), "fresh", fresh); }
+  for (const dir of left) put(sb.file(dir, "ZZold.txt"), "old", old);
 
   // keep the one session, then let five days pass (put its files back to their old times) and run refresh, as the hook would
   assert.equal(sb.tidy(["keep", ids.kept]).code, 0);
@@ -101,7 +106,13 @@ test("the cleanup removes sessions by the file's time, takes the session's folde
     assert.ok(!has(sb, "todos", `${id}-agent-${id}.json`), "old todo files go on their own time");
     assert.ok(!has(sb, "debug", `${id}.txt`), "so do debug logs");
   }
-  // 7. our own folder is not touched by it
+  // 7. besides sessions, old files in these folders go by their age, and new ones stay; in these others even old ones stay
+  for (const [dir, oldName, freshName] of aged) {
+    assert.ok(!has(sb, dir, oldName), `an old file in ${dir}/ is removed`);
+    assert.ok(has(sb, dir, freshName), `a new file in ${dir}/ stays`);
+  }
+  for (const dir of left) assert.ok(has(sb, dir, "ZZold.txt"), `an old file in ${dir}/ stays`);
+  // 8. our own folder is not touched by it
   assert.ok(has(sb, "session-tidy", "trash", "x", "files", "note.txt"), "the trash survives the cleanup");
   assert.ok(has(sb, "session-tidy", "keep.json"));
 });

@@ -24,14 +24,6 @@ Claude Code cannot delete a session from inside, and it silently removes transcr
 
 ## Install
 
-**As a Claude Code plugin.** In Claude Code:
-
-```text
-/plugin install session-tidy@claude-code-toolkit
-```
-
-Then type `/session-tidy:list`. It lists the current project's 15 newest sessions, says in at most 6 lines which look worth deleting and which worth keeping, and changes nothing until you agree. The plugin also carries the silent hook, so a session you keep is touched again when a later session starts.
-
 **From a terminal**, with Node 18 or newer. There is nothing to install and no dependency:
 
 ```bash
@@ -50,7 +42,15 @@ npx -y github:nrzz/claude-session-tidy keep 7ec217ec
 npx -y github:nrzz/claude-session-tidy init
 ```
 
-`claude-session-tidy` in the rest of this document means `npx -y github:nrzz/claude-session-tidy`, or `npm i -g github:nrzz/claude-session-tidy` once, or after `init` `node ~/.claude/session-tidy/app/bin/claude-session-tidy.mjs`. Use the plugin's hook or `init`, not both: with both, `refresh` simply runs twice, which does no harm.
+`claude-session-tidy` in the rest of this document means `npx -y github:nrzz/claude-session-tidy`, or `npm i -g github:nrzz/claude-session-tidy` once, or after `init` `node ~/.claude/session-tidy/app/bin/claude-session-tidy.mjs`.
+
+**As a Claude Code plugin.** In Claude Code:
+
+```text
+/plugin install session-tidy@claude-code-toolkit
+```
+
+Then type `/session-tidy:list`. It lists the current project's 15 newest sessions, says in at most 6 lines which look worth deleting and which worth keeping, and changes nothing until you agree. The plugin also carries the silent hook, so a session you keep is touched again when a later session starts. Use the plugin's hook or `init`, not both: with both, `refresh` simply runs twice, which does no harm.
 
 ## Use
 
@@ -126,6 +126,22 @@ Nothing refreshes them yet, so they are safe for one retention period only. Run:
 Claude Code's cleanup goes by a file's modification time, so `keep` records the id in `session-tidy/keep.json` and touches the transcript and the files the cleanup judges one by one (tool results, older versions' todo files). `refresh` touches every kept session again, but only the ones that have used up half of their period: touching more often would buy nothing, and `claude --continue` picks the session with the newest file time (checked), so every touch moves a session to the front of that list. A session you keep with `keep <id>` is always touched at once. `refresh --quiet` prints nothing, whatever happens. Run it from a cron job, or let the hook do it: `init` adds it to your settings, the plugin ships it.
 
 ```text
+$ claude-session-tidy refresh --dry-run
+Would refresh 1 of 1 kept session
+  7ec217ec  7 files
+
+$ claude-session-tidy refresh
+Refreshed 1 of 1 kept session
+  7ec217ec  7 files
+
+$ claude-session-tidy unkeep 7ec217ec
+Took 1 session off the keep list: 7ec217ec
+Their files keep the time they were last touched; the cleanup treats them like any other session again.
+```
+
+(That `refresh` was run when the kept session's files were 20 days old; for a session with more than half of its 30 days left it says `1 session left alone: used up less than half of its time.`)
+
+```text
 $ claude-session-tidy init
 claude-session-tidy init
   config folder   ~/.claude
@@ -140,6 +156,14 @@ Start a new Claude Code session (or run /hooks) so it picks the hook up.
 
 `init` copies `bin/` and `src/` to `<config>/session-tidy/app/` (so the hook keeps working after `npx` forgets its cache) and adds one entry to `<config>/settings.json`: `{"type": "command", "command": "node", "args": ["<config>/session-tidy/app/bin/claude-session-tidy.mjs", "refresh", "--quiet"], "timeout": 10}` under `hooks.SessionStart`. The file is backed up first, and the entry is added as a text edit: your indentation, line endings, one-line arrays and key order stay as they are, and `uninstall` takes the entry out again and gives back **the same bytes** (a `settings.json` that was empty becomes `{}`, and an empty `"hooks": {}` goes with our entry). A `settings.json` that is not valid JSON, or whose `hooks` has the wrong shape, is left alone with the snippet to add by hand. `uninstall` also deletes the program copy; your keep list, trash and error log stay.
 
+```text
+$ claude-session-tidy uninstall
+claude-session-tidy uninstall
+  backed up settings.json to ~/.claude/settings.json.bak-session-tidy-20261015-120000-2
+  removed 1 SessionStart hook from settings.json (other settings untouched)
+  deleted ~/.claude/session-tidy/app
+```
+
 ### tidy and empty-trash
 
 ```text
@@ -152,6 +176,19 @@ Nothing was moved (--dry-run).
 ```
 
 `tidy` looks for **empty** sessions (nothing typed in them), **orphans** (sessions of projects whose folder no longer exists on disk) and sessions **older** than `--older <days>` (by their last use inside the transcript, which survives a copied config folder), and without `--dry-run` moves them to the trash. With none of the three flags it looks for empty and orphaned sessions; name one or more to choose. It never moves a kept session or one changed in the last 10 minutes, and says how many it left alone. An orphan is only called an orphan when this machine can tell: a path in another system's spelling or on a drive that is not there right now is not judged. On Linux and macOS an unmounted disk looks like a missing folder.
+
+```text
+$ claude-session-tidy empty-trash
+In the trash: 2 sessions, 1.2 MB
+  59a9269a  Old experiment with queues                                914 KB, moved 2026-10-15
+  75372192  Spike: caching layer                                      358 KB, moved 2026-10-15
+Nothing was deleted. Run it again with --yes to delete these for good.
+
+$ claude-session-tidy empty-trash --yes
+Deleted for good: 2 sessions, 1.2 MB
+  59a9269a  Old experiment with queues                                914 KB, moved 2026-10-15
+  75372192  Spike: caching layer                                      358 KB, moved 2026-10-15
+```
 
 `empty-trash` lists what is in the trash and, with `--yes`, deletes it for good (`--older <days>` only those moved to the trash more than that many days ago; `--dry-run` beats `--yes`). Without `--yes` it deletes nothing and exits 1.
 
@@ -183,7 +220,7 @@ The day is the file's modification time plus `cleanupPeriodDays`, read from the 
 - It runs in the background about 5 seconds after Claude Code starts working, at most once a day: it writes `<config>/.last-cleanup` when it is done, and a second start within the day removed nothing. `claude -p` runs it too, if it lives long enough. So a session whose day has come goes the next time Claude Code is started after that, which can be up to a day later than its day.
 - It deletes a transcript when **the file's modification time** is older than the period. The timestamps inside the file play no part: a file with a fresh time and five-day-old records survived, an old file with fresh records did not. So "days until the cleanup" is the modification time plus the period, and touching the file moves it.
 - Sessions started by Claude Desktop (`claude-desktop`, `claude-desktop-3p`, `local-agent` in the records' `entrypoint`) are skipped. Deleting one in the Desktop app writes `<id>.desktop-released.json` with `"reason": "delete"` and frees it at once; archiving writes `"archive"` and frees it a period after the marker was written. `desktopSessionCleanupPeriodDays`, when set, is a ceiling past which a desktop session goes like any other. Sessions started in a terminal (`cli`) or by `claude -p` and the SDK (`sdk-cli`) are not skipped.
-- Besides sessions it removes, by age, old files in `backups/`, `debug/`, `file-transfers/`, `image-cache/`, `logs/`, `paste-cache/`, `plans/` (`*.md`), `shell-snapshots/` (`snapshot-*.sh`), `startup-perf/`, `statsig/` and `todos/`. It left alone old files I put in `cache/`, `file-history/`, `ide/`, `session-env/`, `sessions/`, `state/`, `tasks/`, `telemetry/`, `uploads/` and `usage-data/`, and everything under `session-tidy/`. Orphaned subagent worktrees, which Claude Code's settings description also names, I did not test.
+- Besides sessions it removes, by age, old files in `backups/`, `debug/`, `file-transfers/`, `logs/`, `paste-cache/`, `plans/` (`*.md`), `shell-snapshots/` (`snapshot-*.sh`), `startup-perf/`, `statsig/` and `todos/`, and keeps the new ones. It left alone old files I put in `cache/`, `file-history/`, `ide/`, `session-env/`, `state/`, `tasks/`, `telemetry/`, `uploads/` and `usage-data/`, and everything under `session-tidy/`. Orphaned subagent worktrees, which Claude Code's settings description also names, I did not test.
 
 **What `tidy` leaves for later.** Because the cleanup never removes `file-history/<id>/`, `session-env/<id>/`, `uploads/<id>/` and `tasks/<id>/`, they stay on disk after the cleanup removes the session. `delete` takes them along with the session; finding them for sessions that are already gone is on the [roadmap](ROADMAP.md).
 
@@ -208,12 +245,12 @@ Checked on 2026-10-15 on Windows 11 with Node 24.19 and Claude Code 2.1.295 (the
 - **Safety nets** (`test/keep.test.mjs`, `test/tidy.test.mjs`, `test/cli.test.mjs`): a kept session is never deleted or tidied; an invalid `keep.json` is never overwritten and blocks deletes; ids shorter than 6 characters and ambiguous ones are refused; Windows paths with spaces, a project folder whose name starts like another's, a `settings.json` that is not valid JSON, titles with terminal control codes.
 - **The plugin** (`test/e2e-plugin.test.mjs`): `claude plugin validate` passes, also with `--strict`; the skill's expansion carries the list command with the plugin folder and the project folder filled in (the form 2.1.295 on Windows hands over), or its output (the form 2.1.300 on Linux and macOS hands over), and no unexpanded variable. Installed from a throwaway local marketplace, `claude plugin details` reports the hook as "harness-only, no model context cost", under 30 tokens always-on (17 here) and about 100 on invoke.
 - **Timings** (this machine, Windows 11 on an SSD; 1,000 synthetic sessions of about 130 KB each in 20 projects, 127 MB; medians of 3 runs, three series): 0.76 to 0.79 seconds for `list --all --limit 15`, 4.8 seconds for `list --all` (every transcript read in full), 0.19 seconds for the skill's command on one project of 20, and 0.12 to 0.17 seconds for the hook with 30 kept sessions, of which 0.07 seconds is starting Node.
-- **Token figures** are character counts of the real output divided by 4: 22 lines and 1,786 characters for 15 sessions with ordinary titles, 2,159 with every title at the 60-character cap; the skill's expansion was 619 characters in the check, with a short plugin path.
+- **Token figures** are character counts of the real output divided by 4: 22 lines and 1,786 characters for 15 sessions with ordinary titles, 2,159 with every title at the 60-character cap; the skill's expansion was 685 characters in the Windows check, with a short plugin path.
 
 Not verified:
 
 - Claude Code versions other than 2.1.295 on this machine. The `e2e` workflow installs the newest `@anthropic-ai/claude-code` on Linux and macOS on every push and every Monday, so a release that changes the cleanup fails there. On its first run, with 2.1.300, six of the seven checks then in it passed on both systems; the seventh, the skill's expansion, showed that 2.1.300 on Linux and macOS runs the skill's command itself where 2.1.295 on Windows hands the model an instruction to run it, and the check now accepts both.
-- Organisation-managed settings (`managed-settings.json`, policy settings): not read, and Claude Code ignores the desktop exemption when policy sets the period.
+- Organisation-managed settings (`managed-settings.json`, policy settings): not read. Claude Code's code skips the desktop exemption when policy sets the period; I did not run that.
 - That the skill's `allowed-tools` line approves the `list` command without a prompt in a live session (it covers `list` only, so that `delete` and `keep` still ask you). A prompt could not be exercised without a model, and `-p` with an explicit `--permission-mode` returned nothing for a slash command.
 - That the `/resume` picker orders sessions like `claude --continue` does (by the file's modification time); only `--continue` was checked.
 - `/session-tidy:list` in a live conversation with a model: the expansion was checked, the model's reply was not.
