@@ -5,6 +5,7 @@ All notable changes to claude-session-tidy are written here. The format follows 
 ## [Unreleased]
 
 - Add `list --title <text>` for literal, case-insensitive title searches before limits, combined with project, sort and due filters. Text and markdown headers show the filter and counts; filtered JSON includes `title` and `matched`. Empty search text is rejected without reading sessions.
+- Update repository checks for the intentionally absent `.gitattributes` and the plugin's PNG icon, and compare repository text independently of Windows checkout line endings.
 
 ## [1.1.0] - 2026-10-15
 

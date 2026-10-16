@@ -6,7 +6,8 @@ import { ROOT } from "./helpers.mjs";
 import { COMMANDS } from "../src/cli.mjs";
 import { VERSION } from "../src/version.mjs";
 
-const read = (...p) => fs.readFileSync(path.join(ROOT, ...p), "utf8");
+// Git may check out repository text with CRLF on Windows; compare its logical content.
+const read = (...p) => fs.readFileSync(path.join(ROOT, ...p), "utf8").replace(/\r\n/g, "\n");
 const json = (...p) => JSON.parse(read(...p));
 const pkg = json("package.json");
 
@@ -115,7 +116,7 @@ test("the command's entry file starts with a shebang and imports only the progra
 });
 
 test("repo housekeeping files", () => {
-  assert.equal(read(".gitattributes"), "* text=auto eol=lf\n");
+  assert.ok(!fs.existsSync(path.join(ROOT, ".gitattributes")), "the plugin directory validator rejects repositories with .gitattributes");
   assert.equal(read(".gitignore"), "node_modules/\n*.log\n.DS_Store\n");
   assert.match(read("LICENSE"), /^MIT License\n\nCopyright \(c\) 2026 Naresh Prabu\n/);
   for (const f of ["CODE_OF_CONDUCT.md", "CONTRIBUTING.md", "SECURITY.md", "SUPPORT.md", "ROADMAP.md", "CHANGELOG.md", ".github/PULL_REQUEST_TEMPLATE.md", ".github/dependabot.yml", ".github/ISSUE_TEMPLATE/bug_report.yml", ".github/ISSUE_TEMPLATE/feature_request.yml", ".github/ISSUE_TEMPLATE/config.yml"]) assert.ok(fs.existsSync(path.join(ROOT, f)), f);
@@ -146,7 +147,9 @@ test("plugin.json describes one plugin named session-tidy, and there is no marke
   assert.equal(p.privacyPolicyUrl, "https://github.com/nrzz/claude-session-tidy#privacy");
   assert.ok(p.description.length > 60);
   for (const k of ["sessions", "transcript", "cleanup", "retention", "disk-space", "backup"]) assert.ok(p.keywords.includes(k), k);
-  assert.deepEqual(fs.readdirSync(path.join(ROOT, ".claude-plugin")), ["plugin.json"]);
+  assert.deepEqual(fs.readdirSync(path.join(ROOT, ".claude-plugin")).sort(), ["icon.png", "plugin.json"]);
+  const icon = fs.readFileSync(path.join(ROOT, ".claude-plugin", "icon.png"));
+  assert.deepEqual(icon.subarray(0, 8), Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), "the plugin icon is a PNG");
 });
 
 test("the plugin's hook is one silent SessionStart entry that runs refresh --quiet from the plugin folder", () => {
