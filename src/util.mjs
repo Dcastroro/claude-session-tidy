@@ -3,9 +3,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { StringDecoder } from "node:string_decoder";
 
-// A problem the person can fix (wrong id, bad option). Printed without a stack trace, exit code 1.
+// A problem the person can fix (wrong id, bad option). Printed without a stack trace, exit code 1 by default.
 export class UserError extends Error {}
-export const fail = (message) => { throw new UserError(message); };
+export const fail = (message, exitCode = 1) => { throw Object.assign(new UserError(message), { exitCode }); };
 
 export const DAY = 86400000;
 export const MINUTE = 60000;

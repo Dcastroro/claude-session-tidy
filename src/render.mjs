@@ -35,10 +35,15 @@ function notes(m) {
   return out;
 }
 
-function header(m) {
-  const count = m.due === undefined
+function header(m, markdown = false) {
+  let count = m.due === undefined
     ? (m.shown < m.total ? `${m.shown} of ${m.total}` : `${m.total}`)
     : `${m.shown < m.matched ? `${m.shown} of ${m.matched}` : m.shown} due within ${plural(m.due, "day")}, of ${m.total}`;
+  if (m.title !== undefined) {
+    let query = JSON.stringify(oneLine(m.title, 70));
+    if (markdown) query = query.replace(/[\\`*_[\]<>|]/g, "\\$&");
+    count = `${m.shown < m.matched ? `${m.shown} of ${m.matched}` : m.shown} matching ${query}${m.due === undefined ? "" : `, due within ${plural(m.due, "day")}`}, of ${m.total}`;
+  }
   const where = m.scope.all ? "all projects" : m.scope.label;
   return { title: `Sessions in ${where} (${count}, ${SORT_LABEL[m.sort]})`, cleanup: `Cleanup: ${describeRetention(m.retention)}.` };
 }
@@ -73,7 +78,7 @@ const cell = (s) => String(s).replace(/\|/g, "\\|").replace(/`/g, "'");
 
 // The skill's report: a markdown table, at most MARKDOWN_ROW_CAP rows, a few lines of notes.
 export function renderListMarkdown(m) {
-  const h = header(m);
+  const h = header(m, true);
   const rows = m.rows.slice(0, MARKDOWN_ROW_CAP);
   const lines = [`**${h.title}**`, h.cleanup, ""];
   if (!rows.length) return [...lines, "No sessions."].join("\n");
