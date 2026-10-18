@@ -101,7 +101,7 @@ async function cmdList(args, ctx) {
   const limit = args.limit === undefined ? Infinity : wholeNumber(args.limit, "--limit");
   const due = args.due === undefined ? undefined : wholeNumber(args.due, "--due");
   const title = args.title === undefined ? undefined : String(args.title);
-  if (title !== undefined && !title.trim()) fail("--title needs non-empty text.", 2);
+  if (title !== undefined && !title.trim()) fail("--title needs non-empty text.");
   const scope = scopeOf(args, ctx);
   const { env, now } = ctx;
   const retention = readRetention(env, { projectDir: scope.dir });
@@ -373,7 +373,7 @@ export async function main(argv, io = {}) {
     if (err instanceof UserError) {
       if (json) ctx.out(`${JSON.stringify({ ok: false, error: err.message }, null, 2)}\n`);
       else ctx.warn(`${ctx.c.red("✗")} ${err.message}`);
-      return err.exitCode ?? 1;
+      return 1;
     }
     ctx.warn(`${ctx.c.red("✗")} claude-session-tidy hit an unexpected error: ${err?.stack || err}`);
     return 2;

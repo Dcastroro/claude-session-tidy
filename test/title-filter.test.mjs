@@ -80,13 +80,13 @@ test("list --title explains matching and shown counts in text, markdown and JSON
   assert.deepEqual(empty.sessions, []);
 });
 
-test("list --title rejects empty text with the requested exit code without unexpected-error output", async () => {
+test("list --title rejects empty text as a usage error without unexpected-error output", async () => {
   const w = world("title-invalid");
   const before = snapshot(w.claude);
   for (const title of ["", " ", "\t\n"]) {
     for (const json of [[], ["--json"]]) {
       const r = await run(["list", `--title=${title}`, ...json], w);
-      assert.equal(r.code, 2, r.all);
+      assert.equal(r.code, 1, r.all);
       assert.match(json.length ? JSON.parse(r.out).error : r.err, /--title needs non-empty text/);
       assert.ok(!r.all.includes("unexpected error"));
     }
@@ -121,7 +121,7 @@ test("list --title works in the real CLI with an isolated config and preserves t
   assert.equal(r.out.split("\n").filter((line) => /^\| [0-9a-f]{8}/.test(line)).length, 40);
   assert.match(r.out, /40 rows shown; the report is capped at 40/);
   const invalid = runCli(["list", "--title=", "--json"], { cwd: w.base, env: w.env });
-  assert.equal(invalid.code, 2);
+  assert.equal(invalid.code, 1);
   assert.match(JSON.parse(invalid.out).error, /non-empty text/);
   assert.deepEqual(snapshot(w.claude), before);
 });
